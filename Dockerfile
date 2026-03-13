@@ -5,7 +5,9 @@ WORKDIR /app
 COPY pyproject.toml .
 COPY src/ src/
 
-RUN pip install --no-cache-dir . && python -c "import fastmcp; print('fastmcp version:', fastmcp.__version__)"
+# 先安装所有依赖，再强制锁定 fastmcp 到本地一致的版本
+RUN pip install --no-cache-dir . && \
+    pip install --no-cache-dir --force-reinstall "fastmcp==2.12.5"
 
 EXPOSE 8000
 
