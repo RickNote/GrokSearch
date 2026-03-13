@@ -1,8 +1,18 @@
-"""SSE transport entry-point for remote deployment (Railway / Fly.io / etc.)."""
+"""Streamable-HTTP transport entry-point for remote deployment."""
 
 import os
 import fastmcp
+import uvicorn
+from starlette.applications import Starlette
+from starlette.requests import Request
+from starlette.responses import Response
+from starlette.routing import Mount, Route
+
 from grok_search.server import mcp
+
+
+async def health(request: Request) -> Response:
+    return Response("OK")
 
 
 def main():
@@ -11,9 +21,19 @@ def main():
     print(f"FastMCP version: {fastmcp.__version__}")
     print(f"ENV CHECK - GROK_API_URL set: {bool(os.getenv('GROK_API_URL'))}")
     print(f"ENV CHECK - GROK_API_KEY set: {bool(os.getenv('GROK_API_KEY'))}")
-    print(f"ENV CHECK - GROK_MODEL: {os.getenv('GROK_MODEL', 'not set')}")
-    print(f"Starting GrokSearch MCP server (SSE) on {host}:{port}")
-    mcp.run(transport="sse", host=host, port=port)
+    print(f"Starting GrokSearch MCP server (streamable-http) on {host}:{port}")
+
+    mcp_app = mcp.http_app(path="/mcp")
+
+    app = Starlette(
+        routes=[
+            Route("/", health),
+            Route("/health", health),
+            Mount("/", app=mcp_app),
+        ]
+    )
+
+    uvicorn.run(app, host=host, port=port)
 
 
 if __name__ == "__main__":
