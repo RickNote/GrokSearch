@@ -1,10 +1,12 @@
-"""SSE transport with Bearer token auth for remote deployment (Railway / Fly.io / etc.)."""
+"""Streamable-HTTP transport with Bearer token auth for remote deployment."""
 
 import os
 import uvicorn
+from starlette.applications import Starlette
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
-from starlette.responses import JSONResponse
+from starlette.responses import JSONResponse, Response
+from starlette.routing import Mount, Route
 
 from grok_search.server import mcp
 
@@ -27,13 +29,26 @@ class AuthMiddleware(BaseHTTPMiddleware):
         return await call_next(request)
 
 
+async def health(request: Request) -> Response:
+    return Response("OK")
+
+
 def main():
     port = int(os.getenv("PORT", "8000"))
     host = os.getenv("HOST", "0.0.0.0")
 
-    print(f"Starting GrokSearch MCP server (SSE + Auth) on {host}:{port}")
+    print(f"Starting GrokSearch MCP server (streamable-http + Auth) on {host}:{port}")
 
-    app = mcp.sse_app()
+    # http_app() 兼容 FastMCP 2.x 和 3.x，端点位于 /mcp
+    mcp_app = mcp.http_app(path="/mcp")
+
+    app = Starlette(
+        routes=[
+            Route("/", health),
+            Route("/health", health),
+            Mount("/", app=mcp_app),
+        ]
+    )
     app.add_middleware(AuthMiddleware)
 
     uvicorn.run(app, host=host, port=port)
