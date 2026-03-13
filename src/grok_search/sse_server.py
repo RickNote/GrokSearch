@@ -1,4 +1,4 @@
-"""Streamable-HTTP transport with Bearer token auth for remote deployment."""
+"""SSE transport with Bearer token auth for remote deployment."""
 
 import os
 import uvicorn
@@ -13,13 +13,11 @@ from grok_search.server import mcp
 
 class AuthMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
-        # 健康检查端点不需要认证
         if request.url.path in ("/", "/health"):
             return await call_next(request)
 
         auth_token = os.getenv("MCP_AUTH_TOKEN", "")
         if not auth_token:
-            # 未设置 token 时允许所有请求（开发模式）
             return await call_next(request)
 
         auth_header = request.headers.get("Authorization", "")
@@ -37,16 +35,16 @@ def main():
     port = int(os.getenv("PORT", "8000"))
     host = os.getenv("HOST", "0.0.0.0")
 
-    print(f"Starting GrokSearch MCP server (streamable-http + Auth) on {host}:{port}")
+    print(f"Starting GrokSearch MCP server (SSE + Auth) on {host}:{port}")
 
-    # http_app() 兼容 FastMCP 2.x 和 3.x，端点位于 /mcp
-    mcp_app = mcp.http_app(path="/mcp")
+    # sse_app() 在 FastMCP 2.x 中可用，SSE 端点位于 /sse
+    sse = mcp.sse_app()
 
     app = Starlette(
         routes=[
             Route("/", health),
             Route("/health", health),
-            Mount("/", app=mcp_app),
+            Mount("/", app=sse),
         ]
     )
     app.add_middleware(AuthMiddleware)
